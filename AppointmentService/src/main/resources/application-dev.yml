@@ -1,0 +1,20 @@
+eureka:
+  client:
+    service-url:
+      default-zone: "http://localhost:8761/eureka/"
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5455/appointmentservice
+    username: postgres
+    password: root123
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+        - "*"
+  endpoint:
+    health:
+      show-details: ALWAYS    ### TODO: CHANGE TO when-authorized
+      
+

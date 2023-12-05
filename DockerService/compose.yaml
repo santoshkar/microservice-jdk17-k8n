@@ -1,0 +1,111 @@
+services:
+  smtp4dev:
+    image: 'rnwood/smtp4dev:v3'
+    restart: always
+    ports:
+      - $EMAIL_GUI_LOCAL_PORT:$EMAIL_GUI_DOCKER_PORT
+      - $EMAIL_LOCAL_PORT:$EMAIL_DOCKER_PORT
+    volumes:
+      - smtp4dev-data:/smtp4dev
+  postgres:
+    image: 'postgres:latest'
+    env_file: ./.env
+    environment:
+      - POSTGRES_DB=$POSTGRES_DB
+      - POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+      - POSTGRES_USER=$POSTGRES_USER
+    ports:
+      - $POSTGRES_LOCAL_PORT:$POSTGRES_DOCKER_PORT
+    volumes:
+      - db:/var/lib/postgresql/data
+  eurekaservice:
+    build: ../EurekaServer
+    restart: on-failure
+    env_file: ./.env
+    environment:
+      SPRING_APPLICATION_JSON: '{}'
+    ports:
+      - $EUREKA_SPRING_LOCAL_PORT:$EUREKA_SPRING_DOCKER_PORT
+    volumes:
+      - .m2:/root/.m2
+    stdin_open: true
+    tty: true
+  appointment-service:
+    depends_on:
+      - postgres
+      - eurekaservice
+    build: ../AppointmentService
+    restart: on-failure
+    env_file: ./.env
+    environment:
+      SPRING_APPLICATION_JSON: '{
+        "spring.datasource.url"  : "jdbc:postgresql://postgres:$POSTGRES_DOCKER_PORT/$POSTGRES_DB",
+        "spring.datasource.username" : "$POSTGRES_USER",
+        "spring.datasource.password" : "$POSTGRES_PASSWORD",
+        "spring.jpa.hibernate.ddl-auto" : "update",
+        "eureka.client.service-url.defaultZone": "http://eurekaservice:8761/eureka/",
+        "management.endpoints.web.exposure.include": "*",
+        "management.endpoints.health.show-details": "ALWAYS"
+        }'
+    ports:
+      - $APPOINTMENT_SERVICE_SPRING_LOCAL_PORT:$APPOINTMENT_SERVICE_SPRING_DOCKER_PORT
+    volumes:
+      - .m2:/root/.m2
+    stdin_open: true
+    tty: true
+  doctor-management-service:
+    depends_on:
+      - postgres
+      - eurekaservice
+    build: ../DoctorManagementService
+    restart: on-failure
+    env_file: ./.env
+    environment:
+      SPRING_APPLICATION_JSON: '{
+        "spring.datasource.url"  : "jdbc:postgresql://postgres:$POSTGRES_DOCKER_PORT/$POSTGRES_DB",
+        "spring.datasource.username" : "$POSTGRES_USER",
+        "spring.datasource.password" : "$POSTGRES_PASSWORD",
+        "spring.jpa.hibernate.ddl-auto" : "update",
+        "eureka.client.service-url.defaultZone": "http://eurekaservice:8761/eureka/",
+        "management.endpoints.web.exposure.include": "*",
+        "management.endpoints.health.show-details": "ALWAYS"
+        }'
+    ports:
+      - $DOCTOR_MANAGEMENT_SERVICE_SPRING_LOCAL_PORT:$DOCTOR_MANAGEMENT_SERVICE_SPRING_DOCKER_PORT
+    volumes:
+      - .m2:/root/.m2
+    stdin_open: true
+    tty: true 
+  notification-service:
+    depends_on:
+      - postgres
+      - eurekaservice
+      - smtp4dev
+    build: ../NotificationService
+    restart: on-failure
+    env_file: ./.env
+    environment:
+      SPRING_APPLICATION_JSON: '{
+        "spring.datasource.url"  : "jdbc:postgresql://postgres:$POSTGRES_DOCKER_PORT/$POSTGRES_DB",
+        "spring.datasource.username" : "$POSTGRES_USER",
+        "spring.datasource.password" : "$POSTGRES_PASSWORD",
+        "spring.jpa.hibernate.ddl-auto" : "update",
+        "eureka.client.service-url.defaultZone": "http://eurekaservice:8761/eureka/",
+        "management.endpoints.web.exposure.include": "*",
+        "management.endpoints.health.show-details": "ALWAYS",
+        "spring.mail.host": "smtp4dev",
+        "spring.mail.port": $EMAIL_DOCKER_PORT,
+        "spring.mail.properties.mail.smtp.auth": false,
+        "spring.mail.properties.mail.smtp.starttls.enable": true
+        }'
+    ports:
+     # - $NOTIFICATION_SERVICE_SPRING_LOCAL_PORT:$NOTIFICATION_SERVICE_SPRING_DOCKER_PORT
+      - $NOTIFICATION_SERVICE_SPRING_DOCKER_PORT
+    volumes:
+      - .m2:/root/.m2
+    stdin_open: true
+    tty: true    
+    
+volumes:
+  db:
+  smtp4dev-data:
